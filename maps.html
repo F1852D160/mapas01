@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polígono UTM en Google Maps</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        .info-box {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            z-index: 1000;
+            max-width: 300px;
+        }
+        .info-box h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+        .info-box p {
+            margin: 5px 0;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="info-box">
+        <h3>Polígonos UTM WGS84</h3>
+        <p><strong>Zona:</strong> 20K (Hemisferio Sur)</p>
+        <p><strong>Ubicación:</strong> Tarija, Bolivia</p>
+        <p><strong>🔴 Polígono 1:</strong> 6 puntos</p>
+        <p><strong>🔵 Polígono 2:</strong> 4 puntos</p>
+        <p><strong>💠 Polígono 3:</strong> 4 puntos</p>
+        <p><strong>🟢 Lote-2-Teo:</strong> 4 puntos</p>
+        <p><strong>🟢 Lote-3-Humberto:</strong> 4 puntos</p>
+        <p style="margin-top: 10px; font-size: 11px;">Coordenadas convertidas de UTM a Lat/Lng</p>
+    </div>
+    <div id="map"></div>
+
+    <script>
+        // Función para convertir UTM a Lat/Lng
+        function utmToLatLng(easting, northing, zone, isSouthern) {
+            const a = 6378137.0; // Radio ecuatorial WGS84
+            const e = 0.081819191; // Primera excentricidad
+            const e_sq = e * e;
+            const e_prime_sq = e_sq / (1 - e_sq);
+            const k0 = 0.9996; // Factor de escala
+            
+            // Para hemisferio sur, ajustar el falso norte
+            if (isSouthern) {
+                northing = 10000000 - northing;
+            }
+            
+            // Longitud del meridiano central
+            const lon_origin = (zone - 1) * 6 - 180 + 3;
+            
+            const x = easting - 500000; // Restar falso este
+            const y = northing;
+            
+            const M = y / k0;
+            const mu = M / (a * (1 - e_sq/4 - 3*e_sq*e_sq/64 - 5*e_sq*e_sq*e_sq/256));
+            
+            const e1 = (1 - Math.sqrt(1 - e_sq)) / (1 + Math.sqrt(1 - e_sq));
+            
+            const phi1 = mu + (3*e1/2 - 27*Math.pow(e1, 3)/32) * Math.sin(2*mu) +
+                   (21*Math.pow(e1, 2)/16 - 55*Math.pow(e1, 4)/32) * Math.sin(4*mu) +
+                   (151*Math.pow(e1, 3)/96) * Math.sin(6*mu) +
+                   (1097*Math.pow(e1, 4)/512) * Math.sin(8*mu);
+            
+            const N1 = a / Math.sqrt(1 - e_sq * Math.pow(Math.sin(phi1), 2));
+            const T1 = Math.pow(Math.tan(phi1), 2);
+            const C1 = e_prime_sq * Math.pow(Math.cos(phi1), 2);
+            const R1 = a * (1 - e_sq) / Math.pow(1 - e_sq * Math.pow(Math.sin(phi1), 2), 1.5);
+            const D = x / (N1 * k0);
+            
+            let lat = phi1 - (N1 * Math.tan(phi1) / R1) *
+                  (Math.pow(D, 2)/2 - (5 + 3*T1 + 10*C1 - 4*Math.pow(C1, 2) - 9*e_prime_sq) * Math.pow(D, 4)/24 +
+                   (61 + 90*T1 + 298*C1 + 45*Math.pow(T1, 2) - 252*e_prime_sq - 3*Math.pow(C1, 2)) * Math.pow(D, 6)/720);
+            
+            const lon = (D - (1 + 2*T1 + C1) * Math.pow(D, 3)/6 +
+                   (5 - 2*C1 + 28*T1 - 3*Math.pow(C1, 2) + 8*e_prime_sq + 24*Math.pow(T1, 2)) * Math.pow(D, 5)/120) / Math.cos(phi1);
+            
+            lat = lat * 180 / Math.PI;
+            const longitude = lon_origin + lon * 180 / Math.PI;
+            
+            // Para hemisferio sur, la latitud es negativa
+            if (isSouthern) {
+                lat = -lat;
+            }
+            
+            return { lat: lat, lng: longitude };
+        }
+
+        // Coordenadas UTM del primer polígono (Zona 20S)
+        const utmCoords1 = [
+            { e: 319243.454, n: 7615987.459 },
+            { e: 319302.398, n: 7615978.887 },
+            { e: 319282.442, n: 7615893.110 },
+            { e: 319266.974, n: 7615895.205 },
+            { e: 319261.715, n: 7615885.141 },
+            { e: 319236.081, n: 7615882.371 }
+        ];
+
+        // Coordenadas UTM del segundo polígono (Zona 20S)
+        const utmCoords2 = [
+            { e: 319261.486, n: 7615984.837 },
+            { e: 319274.003, n: 7615983.016 },
+            { e: 319271.351, n: 7615951.697 },
+            { e: 319258.770, n: 7615952.763 }
+        ];
+
+        // Coordenadas UTM del tercer polígono (Zona 20S)
+        const utmCoords3 = [
+            { e: 319274.003, n: 7615983.016 },
+            { e: 319286.933, n: 7615981.136 },
+            { e: 319284.347, n: 7615950.597 },
+            { e: 319271.351, n: 7615951.697 }
+        ];
+
+        // Coordenadas UTM Lote-2-Teo (Zona 20S)
+        const utmCoords4 = [
+            { e: 319289.404, n: 7615976.157 },
+            { e: 319293.730, n: 7615988.060 },
+            { e: 319323.786, n: 7615979.745 },
+            { e: 319320.419, n: 7615967.576 }
+        ];
+
+        // Coordenadas UTM Lote-3-Humberto (Zona 20S)
+        const utmCoords5 = [
+            { e: 319298.198, n: 7616000.356 },
+            { e: 319327.264, n: 7615992.315 },
+            { e: 319323.786, n: 7615979.745 },
+            { e: 319293.730, n: 7615988.060 }
+        ];
+
+        // Convertir a Lat/Lng
+        const zone = 20;
+        const isSouthern = true; // Hemisferio Sur
+        const polygonCoords1 = utmCoords1.map(coord => 
+            utmToLatLng(coord.e, coord.n, zone, isSouthern)
+        );
+        const polygonCoords2 = utmCoords2.map(coord => 
+            utmToLatLng(coord.e, coord.n, zone, isSouthern)
+        );
+        const polygonCoords3 = utmCoords3.map(coord => 
+            utmToLatLng(coord.e, coord.n, zone, isSouthern)
+        );
+        const polygonCoords4 = utmCoords4.map(coord => 
+            utmToLatLng(coord.e, coord.n, zone, isSouthern)
+        );
+        const polygonCoords5 = utmCoords5.map(coord => 
+            utmToLatLng(coord.e, coord.n, zone, isSouthern)
+        );
+
+        // Calcular el centro de todos los polígonos
+        const allCoords = [...polygonCoords1, ...polygonCoords2, ...polygonCoords3, ...polygonCoords4, ...polygonCoords5];
+        const center = {
+            lat: allCoords.reduce((sum, coord) => sum + coord.lat, 0) / allCoords.length,
+            lng: allCoords.reduce((sum, coord) => sum + coord.lng, 0) / allCoords.length
+        };
+
+        function initMap() {
+            const map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 18,
+                center: center,
+                mapTypeId: 'hybrid' // Vista satelital con etiquetas
+            });
+
+            // Crear el primer polígono (rojo)
+            const polygon1 = new google.maps.Polygon({
+                paths: polygonCoords1,
+                strokeColor: '#FF0000',
+                strokeOpacity: 0.8,
+                strokeWeight: 2,
+                fillColor: '#FF0000',
+                fillOpacity: 0.35
+            });
+            polygon1.setMap(map);
+
+            // Crear el segundo polígono (azul oscuro)
+            const polygon2 = new google.maps.Polygon({
+                paths: polygonCoords2,
+                strokeColor: '#0000FF',
+                strokeOpacity: 0.8,
+                strokeWeight: 2,
+                fillColor: '#0000FF',
+                fillOpacity: 0.35
+            });
+            polygon2.setMap(map);
+
+            // Crear el tercer polígono (azul claro/cyan)
+            const polygon3 = new google.maps.Polygon({
+                paths: polygonCoords3,
+                strokeColor: '#00BFFF',
+                strokeOpacity: 0.8,
+                strokeWeight: 2,
+                fillColor: '#00BFFF',
+                fillOpacity: 0.35
+            });
+            polygon3.setMap(map);
+
+            // Crear el cuarto polígono - Lote-2-Teo (verde oscuro)
+            const polygon4 = new google.maps.Polygon({
+                paths: polygonCoords4,
+                strokeColor: '#228B22',
+                strokeOpacity: 0.8,
+                strokeWeight: 2,
+                fillColor: '#228B22',
+                fillOpacity: 0.35
+            });
+            polygon4.setMap(map);
+
+            // Crear el quinto polígono - Lote-3-Humberto (verde claro)
+            const polygon5 = new google.maps.Polygon({
+                paths: polygonCoords5,
+                strokeColor: '#32CD32',
+                strokeOpacity: 0.8,
+                strokeWeight: 2,
+                fillColor: '#32CD32',
+                fillOpacity: 0.35
+            });
+            polygon5.setMap(map);
+
+            // Agregar marcadores en cada vértice del primer polígono
+            polygonCoords1.forEach((coord, index) => {
+                new google.maps.Marker({
+                    position: coord,
+                    map: map,
+                    label: {
+                        text: `1-${index + 1}`,
+                        color: 'white',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                    },
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: '#FF0000',
+                        fillOpacity: 1,
+                        strokeColor: '#FFFFFF',
+                        strokeWeight: 2
+                    },
+                    title: `Polígono 1 - Punto ${index + 1}: ${coord.lat.toFixed(6)}, ${coord.lng.toFixed(6)}`
+                });
+            });
+
+            // Agregar marcadores en cada vértice del segundo polígono
+            polygonCoords2.forEach((coord, index) => {
+                new google.maps.Marker({
+                    position: coord,
+                    map: map,
+                    label: {
+                        text: `2-${index + 1}`,
+                        color: 'white',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                    },
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: '#0000FF',
+                        fillOpacity: 1,
+                        strokeColor: '#FFFFFF',
+                        strokeWeight: 2
+                    },
+                    title: `Polígono 2 - Punto ${index + 1}: ${coord.lat.toFixed(6)}, ${coord.lng.toFixed(6)}`
+                });
+            });
+
+            // Agregar marcadores en cada vértice del tercer polígono
+            polygonCoords3.forEach((coord, index) => {
+                new google.maps.Marker({
+                    position: coord,
+                    map: map,
+                    label: {
+                        text: `3-${index + 1}`,
+                        color: 'white',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                    },
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: '#00BFFF',
+                        fillOpacity: 1,
+                        strokeColor: '#FFFFFF',
+                        strokeWeight: 2
+                    },
+                    title: `Polígono 3 - Punto ${index + 1}: ${coord.lat.toFixed(6)}, ${coord.lng.toFixed(6)}`
+                });
+            });
+
+            // Agregar marcadores en cada vértice del cuarto polígono (Lote-2-Teo)
+            polygonCoords4.forEach((coord, index) => {
+                new google.maps.Marker({
+                    position: coord,
+                    map: map,
+                    label: {
+                        text: `T-${index + 1}`,
+                        color: 'white',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                    },
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: '#228B22',
+                        fillOpacity: 1,
+                        strokeColor: '#FFFFFF',
+                        strokeWeight: 2
+                    },
+                    title: `Lote-2-Teo - Punto ${index + 1}: ${coord.lat.toFixed(6)}, ${coord.lng.toFixed(6)}`
+                });
+            });
+
+            // Agregar marcadores en cada vértice del quinto polígono (Lote-3-Humberto)
+            polygonCoords5.forEach((coord, index) => {
+                new google.maps.Marker({
+                    position: coord,
+                    map: map,
+                    label: {
+                        text: `H-${index + 1}`,
+                        color: 'white',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                    },
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: '#32CD32',
+                        fillOpacity: 1,
+                        strokeColor: '#FFFFFF',
+                        strokeWeight: 2
+                    },
+                    title: `Lote-3-Humberto - Punto ${index + 1}: ${coord.lat.toFixed(6)}, ${coord.lng.toFixed(6)}`
+                });
+            });
+
+            // Agregar un marcador en el centro
+            new google.maps.Marker({
+                position: center,
+                map: map,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 6,
+                    fillColor: '#0000FF',
+                    fillOpacity: 1,
+                    strokeColor: '#FFFFFF',
+                    strokeWeight: 2
+                },
+                title: `Centro: ${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}`
+            });
+        }
+    </script>
+    
+    
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCfc8Ig2TOQZFGVdJsC6sHArHFcrrZCqVQ&callback=initMap">
+    </script>
+
+
+</body>
+</html>
+
