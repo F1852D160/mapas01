@@ -45,6 +45,7 @@
         <p><strong>💠 Polígono 3:</strong> 4 puntos</p>
         <p><strong>🟢 Lote-2-Teo:</strong> 4 puntos</p>
         <p><strong>🟢 Lote-3-Humberto:</strong> 4 puntos</p>
+        <p><strong>🟣 Demetria:</strong> 4 puntos</p>
         <p style="margin-top: 10px; font-size: 11px;">Coordenadas convertidas de UTM a Lat/Lng</p>
     </div>
     <div id="map"></div>
@@ -145,6 +146,14 @@
             { e: 319293.730, n: 7615988.060 }
         ];
 
+        // Coordenadas UTM Demetria (Zona 20S)
+        const utmCoords6 = [
+            { e: 319249.340, n: 7615986.603 },
+            { e: 319261.486, n: 7615984.837 },
+            { e: 319258.770, n: 7615952.763 },
+            { e: 319246.564, n: 7615953.797 }
+        ];
+
         // Convertir a Lat/Lng
         const zone = 20;
         const isSouthern = true; // Hemisferio Sur
@@ -163,9 +172,12 @@
         const polygonCoords5 = utmCoords5.map(coord => 
             utmToLatLng(coord.e, coord.n, zone, isSouthern)
         );
+        const polygonCoords6 = utmCoords6.map(coord => 
+            utmToLatLng(coord.e, coord.n, zone, isSouthern)
+        );
 
         // Calcular el centro de todos los polígonos
-        const allCoords = [...polygonCoords1, ...polygonCoords2, ...polygonCoords3, ...polygonCoords4, ...polygonCoords5];
+        const allCoords = [...polygonCoords1, ...polygonCoords2, ...polygonCoords3, ...polygonCoords4, ...polygonCoords5, ...polygonCoords6];
         const center = {
             lat: allCoords.reduce((sum, coord) => sum + coord.lat, 0) / allCoords.length,
             lng: allCoords.reduce((sum, coord) => sum + coord.lng, 0) / allCoords.length
@@ -232,6 +244,17 @@
                 fillOpacity: 0.35
             });
             polygon5.setMap(map);
+
+            // Crear el sexto polígono - Demetria (morado)
+            const polygon6 = new google.maps.Polygon({
+                paths: polygonCoords6,
+                strokeColor: '#9370DB',
+                strokeOpacity: 0.8,
+                strokeWeight: 2,
+                fillColor: '#9370DB',
+                fillOpacity: 0.35
+            });
+            polygon6.setMap(map);
 
             // Agregar marcadores en cada vértice del primer polígono
             polygonCoords1.forEach((coord, index) => {
@@ -348,6 +371,29 @@
                 });
             });
 
+            // Agregar marcadores en cada vértice del sexto polígono (Demetria)
+            polygonCoords6.forEach((coord, index) => {
+                new google.maps.Marker({
+                    position: coord,
+                    map: map,
+                    label: {
+                        text: `D-${index + 1}`,
+                        color: 'white',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                    },
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: '#9370DB',
+                        fillOpacity: 1,
+                        strokeColor: '#FFFFFF',
+                        strokeWeight: 2
+                    },
+                    title: `Demetria - Punto ${index + 1}: ${coord.lat.toFixed(6)}, ${coord.lng.toFixed(6)}`
+                });
+            });
+
             // Agregar un marcador en el centro
             new google.maps.Marker({
                 position: center,
@@ -365,7 +411,6 @@
         }
     </script>
     
-    
     <script async defer
         src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCfc8Ig2TOQZFGVdJsC6sHArHFcrrZCqVQ&callback=initMap">
     </script>
@@ -373,4 +418,3 @@
 
 </body>
 </html>
-
